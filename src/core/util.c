@@ -277,7 +277,7 @@ int32_t janet_tablen(int32_t n) {
     n |= n >> 4;
     n |= n >> 8;
     n |= n >> 16;
-    return n + 1;
+    return n == INT32_MAX ? INT32_MAX : n + 1;
 }
 
 /* Avoid some undefined behavior that was common in the code base. */
