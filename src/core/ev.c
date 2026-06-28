@@ -360,7 +360,8 @@ JanetStream *janet_stream(JanetHandle handle, uint32_t flags, const JanetMethod 
 static void janet_stream_close_impl(JanetStream *stream) {
     stream->flags |= JANET_STREAM_CLOSED;
     int canclose = !(stream->flags & JANET_STREAM_NOT_CLOSEABLE);
-    int canunregister = !(stream->flags & JANET_STREAM_UNREGISTERED);
+    /* If we are positive that the stream is the last instance of the underlying file description (such that "dup" was never called on the file description)
+     * then skip unregister to save a syscall */
 #ifdef JANET_WINDOWS
     if (stream->handle != INVALID_HANDLE_VALUE) {
 #ifdef JANET_NET
@@ -374,6 +375,7 @@ static void janet_stream_close_impl(JanetStream *stream) {
         stream->handle = INVALID_HANDLE_VALUE;
     }
 #else
+    int canunregister = !(stream->flags & JANET_STREAM_UNREGISTERED) && !(stream->flags & JANET_STREAM_NODUPS);
     if (stream->handle != -1) {
         if (canunregister) janet_unregister_stream(stream);
         if (canclose) close(stream->handle);
@@ -431,6 +433,7 @@ static void janet_stream_marshal(void *p, JanetMarshalContext *ctx) {
     if (!(janet_marshal_flags(ctx) & JANET_MARSHAL_UNSAFE)) {
         janet_panic("can only marshal stream with unsafe flag");
     }
+    s->flags &= ~JANET_STREAM_NODUPS; /* This stream now might be duplicated, invalidates some EV optimizations */
     janet_marshal_abstract(ctx, p);
     janet_marshal_int(ctx, (int32_t) s->flags);
     janet_marshal_ptr(ctx, s->methods);
@@ -1981,9 +1984,7 @@ void janet_unregister_stream(JanetStream *stream) {
     do {
         status = kevent(janet_vm.kq, kevs, length, NULL, 0, NULL);
     } while (status == -1 && errno == EINTR);
-    if (status == -1) {
-        janet_panicv(janet_ev_lasterr());
-    }
+    /* Status might be -1 on BSDs for subprocesses */
     stream->flags |= JANET_STREAM_UNREGISTERED;
 }
 
@@ -3573,6 +3574,7 @@ static JanetFile *get_file_for_stream(JanetStream *stream) {
     }
     if (index == 0) return NULL;
     /* duplicate handle when converting stream to file */
+    stream->flags &= ~JANET_STREAM_NODUPS;
 #ifdef JANET_WINDOWS
     int htype = 0;
     if (fmt[0] == 'r' && fmt[1] == '+') {

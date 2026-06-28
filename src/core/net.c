@@ -1245,7 +1245,7 @@ static const JanetMethod net_stream_methods[] = {
 };
 
 static JanetStream *make_stream(JSock handle, uint32_t flags) {
-    return janet_stream((JanetHandle) handle, flags | JANET_STREAM_SOCKET, net_stream_methods);
+    return janet_stream((JanetHandle) handle, flags | JANET_STREAM_SOCKET | JANET_STREAM_NODUPS, net_stream_methods);
 }
 
 void janet_lib_net(JanetTable *env) {

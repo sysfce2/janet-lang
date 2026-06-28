@@ -1634,7 +1634,14 @@ JANET_CORE_FN(os_shell,
                       ? janet_getcstring(argv, 0)
                       : NULL;
 #ifdef JANET_EV
-    janet_ev_threaded_await(os_shell_subr, 0, argc, cmd ? strdup(cmd) : NULL);
+    char *cmd_copy = NULL;
+    if (cmd != NULL) {
+        size_t cmdlen = strlen(cmd);
+        cmd_copy = janet_malloc(cmdlen + 1);
+        memcpy(cmd_copy, cmd, cmdlen);
+        cmd_copy[cmdlen] = '\0';
+    }
+    janet_ev_threaded_await(os_shell_subr, 0, argc, cmd_copy);
 #else
     int stat = system(cmd);
     return argc
