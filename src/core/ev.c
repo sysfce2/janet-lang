@@ -375,7 +375,7 @@ static void janet_stream_close_impl(JanetStream *stream) {
         stream->handle = INVALID_HANDLE_VALUE;
     }
 #else
-    int canunregister = !(stream->flags & JANET_STREAM_UNREGISTERED) && !(stream->flags & JANET_STREAM_NODUPS);
+    int canunregister = !(stream->flags & JANET_STREAM_UNREGISTERED);
     if (stream->handle != -1) {
         if (canunregister) janet_unregister_stream(stream);
         if (canclose) close(stream->handle);
@@ -1785,6 +1785,7 @@ void janet_stream_level_triggered(JanetStream *stream) {
 }
 
 void janet_unregister_stream(JanetStream *stream) {
+    if (stream->flags & JANET_STREAM_NODUPS) return;
     int status;
     do {
         status = epoll_ctl(janet_vm.epoll, EPOLL_CTL_DEL, stream->handle, NULL);
@@ -1972,6 +1973,7 @@ void janet_stream_level_triggered(JanetStream *stream) {
 }
 
 void janet_unregister_stream(JanetStream *stream) {
+    if (stream->flags & JANET_STREAM_NODUPS) return;
     struct kevent kevs[2];
     int length = 0;
     if (stream->flags & (JANET_STREAM_READABLE | JANET_STREAM_ACCEPTABLE)) {
